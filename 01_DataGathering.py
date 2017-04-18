@@ -9,6 +9,9 @@ from pymongo import MongoClient
 from collections import deque
 import cassiopeia
 from cassiopeia import riotapi
+import pdb
+import resource
+import os.path
 
 riotapi.set_region("KR")
 riotapi.set_api_key("79428a9e-5d98-469b-9b9b-429c1a750d24")
@@ -18,16 +21,19 @@ riotapi.print_calls(True)
 #%% 
 
 client = MongoClient()
-loladb = client.loladb
+loladb = client.loladb73
 summoners_collection = loladb.summoners
 matches_collection = loladb.matches
 
 if summoners_collection.count() == 0:
     #Save summoner information to mongodb
     masters = riotapi.get_master()
+    challengers = riotapi.get_challenger()
     summoners_collection.insert_many([json.loads(entry.to_json()) for entry in masters.data.entries])
+    summoners_collection.insert_many([json.loads(entry.to_json()) for entry in challengers.data.entries])
     
-print summoners_collection.count()
+summoner_count = summoners_collection.count()
+print summoner_count
 print matches_collection.count()
 
 #%% 
@@ -51,11 +57,11 @@ def IsSoloRank(match_type):
         return False
     
 def IsRequiredMatch(match_dict):
-    if IsSoloRank(match_dict['queueType']) and match_dict['matchMode'] == 'CLASSIC' and match_dict['matchType'] == 'MATCHED_GAME':
+    if IsSoloRank(match_dict['queueType']) and match_dict['matchVersion'].startswith('7.3') and match_dict['matchMode'] == 'CLASSIC' and match_dict['matchType'] == 'MATCHED_GAME':
         return True
     else:
         return False
-    
+
 def RecordMatchesForSummoner(a_summoner):
     print a_summoner
     print 'Get matches for summoner with id :' + str(a_summoner['playerOrTeamId'])
@@ -95,7 +101,7 @@ def RecordMatchesForSummoner(a_summoner):
             match_dict = json.loads(match_data.to_json())
             print match_dict['matchId']
             print match_dict['matchCreation']
-            if IsLatestMatch(match_dict['season']):
+            if match_dict['matchVersion'].startswith('7.3'):#or match_dict['matchVersion'].startswith('7.2'):
                 if IsRequiredMatch(match_dict):
                     matches_collection.insert_one(match_dict)
                     print 'Match saved to db with id ' + str(match.id)
@@ -113,12 +119,50 @@ def RecordMatchesForSummoner(a_summoner):
         
 #summoner_0 = summoners_collection.find_one()
 #RecordMatchesForSummoner(summoner_0)
+last_summoner_id = -1
+if os.path.exists("LastSummonerId.txt"):
+    with open("LastSummonerId.txt", "r") as f:
+        last_summoner_id = int(f.readline())
+        print "Read last summoner id " + str(last_summoner_id)
 
+grab_started = False
+if last_summoner_id == -1:
+    grab_started = True
+    
 for a_idx,current_summoner in enumerate(summoners_collection.find({}, no_cursor_timeout=True)):
-    if a_idx < 560:
+    
+    print "Checking id " + str(current_summoner['playerOrTeamId'])
+    if str(current_summoner['playerOrTeamId']) == str(last_summoner_id):
+        grab_started = True
+        
+    if grab_started == False:
         continue
+    
+    print "Continue grabbing from id %s (%d/%d)" % (current_summoner['playerOrTeamId'], a_idx, summoner_count)
+    memory_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    print "Memory usage:" + str(memory_usage)
+    
+    if memory_usage > 1500000:
+        print "Quit for using too much memory!"
+        quit()
+        
+        
+    #record last started id
+    with open("LastSummonerId.txt", "w") as f:
+        print "Write last summoner id " + str(current_summoner['playerOrTeamId'])
+        f.write(str(current_summoner['playerOrTeamId']))
+        f.close()
+        
     try:
         RecordMatchesForSummoner(current_summoner)
     except (AttributeError, cassiopeia.type.api.exception.APIError) as apiError:
         print apiError
         print "Oops!  Error happened. Keep going..."
+        
+    if a_idx == summoner_count - 1:
+        #recycle if getting to the last one
+        with open("LastSummonerId.txt", "w") as f:
+                f.write(str(-1))
+                f.close()
+        quit()
+
