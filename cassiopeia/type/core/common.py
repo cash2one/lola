@@ -226,7 +226,10 @@ class Queue(enum.Enum):
     random_urf = "ARURF_5X5"
     dynamic_queue = "TEAM_BUILDER_DRAFT_UNRANKED_5x5"
     ranked_dynamic_queue = "TEAM_BUILDER_DRAFT_RANKED_5x5"
+    ranked_solo_queue = "TEAM_BUILDER_RANKED_SOLO"
     flex = "RANKED_FLEX_SR"
+    flex_threes = "RANKED_FLEX_TT"
+
 
     def for_id(id_):
         try:
@@ -242,7 +245,7 @@ Queue.by_id = {
     14: Queue.normal_draft_fives,
     4: Queue.ranked_solo,
     6: Queue.ranked_premade_fives,
-    9: Queue.ranked_premade_threes,
+    9: Queue.flex_threes,
     41: Queue.ranked_threes,
     42: Queue.ranked_fives,
     16: Queue.dominion_blind,
@@ -276,9 +279,10 @@ Queue.by_id = {
     318: Queue.random_urf,
     400: Queue.dynamic_queue,
     410: Queue.ranked_dynamic_queue,
+    420: Queue.ranked_solo_queue,
     440: Queue.flex
 }
-ranked_queues = {Queue.ranked_solo, Queue.ranked_threes, Queue.ranked_fives, Queue.ranked_dynamic_queue, Queue.flex}
+ranked_queues = {Queue.ranked_solo, Queue.ranked_threes, Queue.ranked_fives, Queue.ranked_dynamic_queue, Queue.flex, Queue.flex_threes, Queue.ranked_solo_queue}
 
 
 class Tier(enum.Enum):
@@ -397,6 +401,7 @@ class SubType(enum.Enum):
     black_market = "BILGEWATER"
     nexus_siege = "SIEGE"
     flex = "RANKED_FLEX_SR"
+    flex_threes = "RANKED_FLEX_TT"
 
 
 class StatSummaryType(enum.Enum):
